@@ -1,0 +1,465 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { getInvoice, updateInvoice, getClients } from '../../services/firestore';
+import { Client, InvoiceItem, Invoice } from '../../types';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import LoadingSpinner from '../common/LoadingSpinner';
+import toast from 'react-hot-toast';
+
+const EditInvoice: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const { userProfile } = useAuth();
+  const navigate = useNavigate();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [formData, setFormData] = useState({
+    invoiceNumber: '',
+    clientId: '',
+    issueDate: '',
+    dueDate: '',
+    taxRate: 18,
+    notes: '',
+    status: 'draft' as const
+  });
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+
+  useEffect(() => {
+    if (id) {
+      fetchInvoice();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [userProfile?.uid]);
+
+  const fetchInvoice = async () => {
+    if (!id) return;
+
+    try {
+      const invoiceData = await getInvoice(id);
+      if (invoiceData) {
+        setInvoice(invoiceData);
+        setFormData({
+          invoiceNumber: invoiceData.invoiceNumber,
+          clientId: invoiceData.clientId,
+          issueDate: invoiceData.issueDate.toISOString().split('T')[0],
+          dueDate: invoiceData.dueDate.toISOString().split('T')[0],
+          taxRate: invoiceData.taxRate,
+          notes: invoiceData.notes || '',
+          status: invoiceData.status
+        });
+        setItems(invoiceData.items);
+      } else {
+        toast.error('Invoice not found');
+        navigate('/invoices');
+      }
+    } catch (error) {
+      console.error('Error fetching invoice:', error);
+      toast.error('Failed to load invoice');
+      navigate('/invoices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchClients = async () => {
+    if (!userProfile?.uid) return;
+
+    try {
+      const clientsData = await getClients(userProfile.uid);
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    
+    if (field === 'quantity' || field === 'rate') {
+      updatedItems[index].amount = updatedItems[index].quantity * updatedItems[index].rate;
+    }
+    
+    setItems(updatedItems);
+  };
+
+  const addItem = () => {
+    setItems([...items, {
+      id: Date.now().toString(),
+      description: '',
+      quantity: 1,
+      rate: 0,
+      amount: 0
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
+    }
+  };
+
+  const calculateTotals = () => {
+    const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+    const taxAmount = (subtotal * formData.taxRate) / 100;
+    const total = subtotal + taxAmount;
+    return { subtotal, taxAmount, total };
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.clientId) {
+      toast.error('Please select a client');
+      return;
+    }
+
+    if (items.some(item => !item.description || item.quantity <= 0 || item.rate <= 0)) {
+      toast.error('Please fill in all item details');
+      return;
+    }
+
+    if (!id) return;
+
+    setSaving(true);
+    try {
+      const selectedClient = clients.find(c => c.id === formData.clientId);
+      if (!selectedClient) {
+        throw new Error('Selected client not found');
+      }
+
+      const { subtotal, taxAmount, total } = calculateTotals();
+
+      const updateData = {
+        invoiceNumber: formData.invoiceNumber,
+        clientId: formData.clientId,
+        client: selectedClient,
+        items,
+        subtotal,
+        taxRate: formData.taxRate,
+        taxAmount,
+        total,
+        status: formData.status,
+        issueDate: new Date(formData.issueDate),
+        dueDate: new Date(formData.dueDate),
+        notes: formData.notes
+      };
+
+      await updateInvoice(id, updateData);
+      toast.success('Invoice updated successfully');
+      navigate('/invoices');
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      toast.error('Failed to update invoice');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  const { subtotal, taxAmount, total } = calculateTotals();
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={() => navigate('/invoices')}
+          className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Edit Invoice #{invoice?.invoiceNumber}
+          </h1>
+          <p className="text-gray-600 mt-1">Update invoice details</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Invoice Details */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Details</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="invoiceNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                Invoice Number
+              </label>
+              <input
+                type="text"
+                id="invoiceNumber"
+                name="invoiceNumber"
+                value={formData.invoiceNumber}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="issueDate" className="block text-sm font-medium text-gray-700 mb-2">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                id="issueDate"
+                name="issueDate"
+                value={formData.issueDate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-2">
+                Due Date
+              </label>
+              <input
+                type="date"
+                id="dueDate"
+                name="dueDate"
+                value={formData.dueDate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Client Selection */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Client Information</h2>
+          <div>
+            <label htmlFor="clientId" className="block text-sm font-medium text-gray-700 mb-2">
+              Select Client
+            </label>
+            <select
+              id="clientId"
+              name="clientId"
+              value={formData.clientId}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              <option value="">Choose a client...</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name} - {client.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Items</h2>
+            <button
+              type="button"
+              onClick={addItem}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Item</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {items.map((item, index) => (
+              <div key={item.id} className="grid grid-cols-12 gap-4 items-end">
+                <div className="col-span-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={item.description}
+                    onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Item description"
+                    required
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantity
+                  </label>
+                  <input
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rate (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={item.rate}
+                    onChange={(e) => handleItemChange(index, 'rate', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Amount (₹)
+                  </label>
+                  <input
+                    type="text"
+                    value={item.amount.toFixed(2)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    readOnly
+                  />
+                </div>
+                
+                <div className="col-span-1">
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Totals & Settings */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Tax Settings */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Tax & Notes</h2>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700 mb-2">
+                  Tax Rate (%)
+                </label>
+                <input
+                  type="number"
+                  id="taxRate"
+                  name="taxRate"
+                  value={formData.taxRate}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes
+                </label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Additional notes or terms..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Totals */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Summary</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-medium">₹{subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tax ({formData.taxRate}%):</span>
+                <span className="font-medium">₹{taxAmount.toFixed(2)}</span>
+              </div>
+              <div className="border-t pt-3">
+                <div className="flex justify-between">
+                  <span className="text-lg font-semibold text-gray-900">Total:</span>
+                  <span className="text-lg font-bold text-blue-600">₹{total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => navigate('/invoices')}
+            className="px-6 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            {saving && <LoadingSpinner size="sm" color="text-white" />}
+            <span>Update Invoice</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default EditInvoice;

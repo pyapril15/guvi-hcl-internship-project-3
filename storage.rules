@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Rules for invoice PDFs in the "Automated Invoice Generator" folder
+    match /Automated Invoice Generator/{userId}/{allPaths=**} {
+      // Users can only access their own files
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Rules for user profile images
+    match /profile-images/{userId}/{allPaths=**} {
+      allow read: if true; // Public read for profile images
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Rules for business logos
+    match /business-logos/{userId}/{allPaths=**} {
+      allow read: if true; // Public read for business logos
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
