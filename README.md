@@ -2,6 +2,9 @@
 
 A comprehensive, production-ready invoice generation system built for freelancers and small businesses. Create, manage, and send professional invoices with ease.
 
+<img src="assets/dashboard.png" height="400" />
+<img src="assets/invoice.png" width="400" />
+
 ## 🚀 Features
 
 ### Core Functionality
