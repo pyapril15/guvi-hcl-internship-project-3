@@ -151,7 +151,13 @@ const Dashboard: React.FC = () => {
                 <div className="p-6">
                     {invoices.length === 0 ? (
                         <div className="text-center py-8">
-                            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4"/>
+                            <div className="inline-block bg-blue-600 p-2 rounded-lg">
+                                <img
+                                    src="/favicon.ico"
+                                    alt="Logo"
+                                    className="w-6 h-6"
+                                />
+                            </div>
                             <p className="text-gray-500">No invoices yet. Create your first invoice!</p>
                         </div>
                     ) : (

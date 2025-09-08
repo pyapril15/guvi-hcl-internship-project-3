@@ -1,4 +1,4 @@
-# InvoiceFlow - Professional Invoice Generator
+# Professional Invoice Generator
 
 A comprehensive, production-ready invoice generation system built for freelancers and small businesses. Create, manage, and send professional invoices with ease.
 
@@ -177,22 +177,6 @@ Storage rules ensure file security:
 - Account management
 - Data export options
 
-## 🚀 Deployment
-
-### Firebase Hosting (Recommended)
-1. Install Firebase CLI: `npm install -g firebase-tools`
-2. Login: `firebase login`
-3. Initialize: `firebase init hosting`
-4. Build: `npm run build`
-5. Deploy: `firebase deploy`
-
-### Other Platforms
-The application can be deployed to:
-- Netlify
-- Vercel
-- AWS S3 + CloudFront
-- Any static hosting service
-
 ## 🧪 Testing
 
 ```bash
@@ -268,8 +252,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For support and questions:
 - Create an issue on GitHub
-- Email: support@invoiceflow.com
-- Documentation: [docs.invoiceflow.com](https://docs.invoiceflow.com)
+- Email: support@Invoice Generator.com
+- Documentation: [docs.Invoice Generator.com](https://docs.Invoice Generator.com)
 
 ## 🎯 Roadmap
 
@@ -340,4 +324,4 @@ Built with ❤️ by [PyApril15](https://github.com/pyapril15) for the GUVI HCL 
 
 ---
 
-**InvoiceFlow** - Making professional invoicing simple and efficient for everyone.
+**Invoice Generator** - Making professional invoicing simple and efficient for everyone.

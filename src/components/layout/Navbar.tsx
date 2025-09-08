@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { FileText, LogOut, Settings, User } from 'lucide-react';
+import {LogOut, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Navbar: React.FC = () => {
@@ -22,10 +22,15 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <div className="flex items-center">
             <div className="bg-blue-600 p-2 rounded-lg">
-              <FileText className="w-6 h-6 text-white" />
+              <img
+                  src="/favicon.ico"
+                  alt="Logo"
+                  className="w-6 h-6"
+              />
             </div>
+
             <h1 className="ml-3 text-xl font-bold text-gray-900">
-              InvoiceFlow
+              Invoice Generator
             </h1>
           </div>
 

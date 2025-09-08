@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
-import { FileText, Shield, Zap, TrendingUp, Users } from 'lucide-react';
+import {Shield, Zap, TrendingUp, Users } from 'lucide-react';
 
 /**
  * AuthPage Component
@@ -21,11 +21,15 @@ const AuthPage: React.FC = () => {
             <div className="text-center lg:text-left">
               {/* Logo and Brand Name */}
               <div className="flex items-center justify-center lg:justify-start mb-8">
-                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3 rounded-xl shadow-lg">
-                  <FileText className="w-8 h-8 text-white" />
+                <div className="bg-blue-600 p-2 rounded-lg">
+                  <img
+                      src="/favicon.ico"
+                      alt="Logo"
+                      className="w-6 h-6"
+                  />
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 ml-3">
-                  InvoiceFlow
+                  Invoice Generator
                 </h1>
               </div>
 
@@ -120,11 +124,15 @@ const AuthPage: React.FC = () => {
         {/* Mobile Branding - Shown only on small screens */}
         <div className="lg:hidden absolute top-4 left-4">
           <div className="flex items-center">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-2 rounded-lg shadow-lg">
-              <FileText className="w-6 h-6 text-white" />
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <img
+                  src="/favicon.ico"
+                  alt="Logo"
+                  className="w-6 h-6"
+              />
             </div>
             <h1 className="text-xl font-bold text-gray-900 ml-2">
-              InvoiceFlow
+              Invoice Generator
             </h1>
           </div>
         </div>
@@ -132,7 +140,7 @@ const AuthPage: React.FC = () => {
         {/* Footer */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
           <p className="text-xs text-gray-500 text-center">
-            © 2025 InvoiceFlow. All rights reserved. |
+            © 2025 Invoice Generator. All rights reserved. |
             <span className="ml-1">Trusted by professionals worldwide</span>
           </p>
         </div>
