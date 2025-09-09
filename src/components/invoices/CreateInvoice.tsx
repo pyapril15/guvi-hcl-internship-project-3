@@ -1,20 +1,22 @@
-import React, {useEffect, useState} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {useAuth} from '../../contexts/AuthContext';
-import {createInvoice, getClients} from '../../services/firestore';
-import {Client, InvoiceItem} from '../../types';
-import {ArrowLeft, Plus, Trash2} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { createInvoice, getClients } from '../../services/firestore';
+import { Client, InvoiceItem } from '../../types';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 const CreateInvoice: React.FC = () => {
-    const {userProfile} = useAuth();
+    const { userProfile } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const clientIdFromUrl = searchParams.get('clientId');
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         invoiceNumber: `INV-${Date.now()}`,
-        clientId: '',
+        clientId: clientIdFromUrl || '',
         issueDate: new Date().toISOString().split('T')[0],
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         taxRate: 18,
@@ -22,12 +24,18 @@ const CreateInvoice: React.FC = () => {
         status: 'draft' as const
     });
     const [items, setItems] = useState<InvoiceItem[]>([
-        {id: '1', description: '', quantity: 1, rate: 0, amount: 0}
+        { id: '1', description: '', quantity: 1, rate: 0, amount: 0 }
     ]);
 
     useEffect(() => {
         fetchClients();
     }, [userProfile?.uid]);
+
+    useEffect(() => {
+        if (clientIdFromUrl) {
+            setFormData(prev => ({ ...prev, clientId: clientIdFromUrl }));
+        }
+    }, [clientIdFromUrl]);
 
     const fetchClients = async () => {
         if (!userProfile?.uid) return;
@@ -41,13 +49,13 @@ const CreateInvoice: React.FC = () => {
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const {name, value} = e.target;
-        setFormData(prev => ({...prev, [name]: value}));
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number) => {
         const updatedItems = [...items];
-        updatedItems[index] = {...updatedItems[index], [field]: value};
+        updatedItems[index] = { ...updatedItems[index], [field]: value };
 
         if (field === 'quantity' || field === 'rate') {
             updatedItems[index].amount = updatedItems[index].quantity * updatedItems[index].rate;
@@ -76,7 +84,7 @@ const CreateInvoice: React.FC = () => {
         const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
         const taxAmount = (subtotal * formData.taxRate) / 100;
         const total = subtotal + taxAmount;
-        return {subtotal, taxAmount, total};
+        return { subtotal, taxAmount, total };
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -101,7 +109,7 @@ const CreateInvoice: React.FC = () => {
                 throw new Error('Selected client not found');
             }
 
-            const {subtotal, taxAmount, total} = calculateTotals();
+            const { subtotal, taxAmount, total } = calculateTotals();
 
             const invoiceData = {
                 invoiceNumber: formData.invoiceNumber,
@@ -120,7 +128,13 @@ const CreateInvoice: React.FC = () => {
 
             await createInvoice(userProfile.uid, invoiceData);
             toast.success('Invoice created successfully');
-            navigate('/invoices');
+
+            // Navigate back to filtered invoices if came from client page
+            if (clientIdFromUrl) {
+                navigate(`/invoices?clientId=${clientIdFromUrl}`);
+            } else {
+                navigate('/invoices');
+            }
         } catch (error) {
             console.error('Error creating invoice:', error);
             toast.error('Failed to create invoice');
@@ -129,20 +143,31 @@ const CreateInvoice: React.FC = () => {
         }
     };
 
-    const {subtotal, taxAmount, total} = calculateTotals();
+    const handleCancel = () => {
+        if (clientIdFromUrl) {
+            navigate(`/invoices?clientId=${clientIdFromUrl}`);
+        } else {
+            navigate('/invoices');
+        }
+    };
+
+    const { subtotal, taxAmount, total } = calculateTotals();
+    const selectedClient = clients.find(c => c.id === formData.clientId);
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center space-x-4">
                 <button
-                    onClick={() => navigate('/invoices')}
+                    onClick={handleCancel}
                     className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                    <ArrowLeft className="w-5 h-5"/>
+                    <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Create New Invoice</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                        {clientIdFromUrl ? `Create Invoice for ${selectedClient?.name || 'Client'}` : 'Create New Invoice'}
+                    </h1>
                     <p className="text-gray-600 mt-1">Fill in the details to create a new invoice</p>
                 </div>
             </div>
@@ -204,7 +229,7 @@ const CreateInvoice: React.FC = () => {
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Client Information</h2>
                     <div>
                         <label htmlFor="clientId" className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Client
+                            Select Client {clientIdFromUrl && <span className="text-blue-600">(Pre-selected)</span>}
                         </label>
                         <select
                             id="clientId"
@@ -213,6 +238,7 @@ const CreateInvoice: React.FC = () => {
                             onChange={handleChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             required
+                            disabled={!!clientIdFromUrl}
                         >
                             <option value="">Choose a client...</option>
                             {clients.map((client) => (
@@ -221,6 +247,13 @@ const CreateInvoice: React.FC = () => {
                                 </option>
                             ))}
                         </select>
+                        {clientIdFromUrl && selectedClient && (
+                            <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                                <p className="text-sm text-blue-800">
+                                    Creating invoice for: <strong>{selectedClient.name}</strong> ({selectedClient.email})
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -233,7 +266,7 @@ const CreateInvoice: React.FC = () => {
                             onClick={addItem}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                         >
-                            <Plus className="w-4 h-4"/>
+                            <Plus className="w-4 h-4" />
                             <span>Add Item</span>
                         </button>
                     </div>
@@ -304,7 +337,7 @@ const CreateInvoice: React.FC = () => {
                                             onClick={() => removeItem(index)}
                                             className="p-2 text-red-400 hover:text-red-600 transition-colors"
                                         >
-                                            <Trash2 className="w-4 h-4"/>
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     )}
                                 </div>
@@ -379,7 +412,7 @@ const CreateInvoice: React.FC = () => {
                 <div className="flex justify-end space-x-4">
                     <button
                         type="button"
-                        onClick={() => navigate('/invoices')}
+                        onClick={handleCancel}
                         className="px-6 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                     >
                         Cancel
@@ -389,7 +422,7 @@ const CreateInvoice: React.FC = () => {
                         disabled={loading}
                         className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                     >
-                        {loading && <LoadingSpinner size="sm" color="text-white"/>}
+                        {loading && <LoadingSpinner size="sm" color="text-white" />}
                         <span>Create Invoice</span>
                     </button>
                 </div>

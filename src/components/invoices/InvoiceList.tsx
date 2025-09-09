@@ -1,19 +1,37 @@
-import React, {useEffect, useState} from 'react';
-import {Link} from 'react-router-dom';
-import {useAuth} from '../../contexts/AuthContext';
-import {deleteInvoice, getInvoices, updateInvoice} from '../../services/firestore';
-import {generateInvoicePDF} from '../../services/pdfService';
-import {Invoice} from '../../types';
-import {Download, Edit, Filter, Mail, Plus, Trash2} from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import {Link, useSearchParams} from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { deleteInvoice, getInvoices, updateInvoice } from '../../services/firestore';
+import { generateInvoicePDF } from '../../services/pdfService';
+import { Invoice } from '../../types';
+import { Download, Edit, Filter, Mail, Plus, Search, Trash2 } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import {format} from 'date-fns';
+import { format } from 'date-fns';
+import {
+    useReactTable,
+    getCoreRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
+    createColumnHelper,
+    flexRender,
+    SortingState,
+    ColumnFiltersState,
+} from '@tanstack/react-table';
+
+const columnHelper = createColumnHelper<Invoice>();
 
 const InvoiceList: React.FC = () => {
-    const {userProfile} = useAuth();
+    const { userProfile } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'sent' | 'paid' | 'overdue'>('all');
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [globalFilter, setGlobalFilter] = useState('');
+
+    const [searchParams] = useSearchParams();
+    const clientIdFromUrl = searchParams.get('clientId');
 
     useEffect(() => {
         fetchInvoices();
@@ -93,9 +111,9 @@ ${userProfile.displayName || userProfile.businessName}`;
 
     const handleStatusChange = async (invoiceId: string, newStatus: Invoice['status']) => {
         try {
-            await updateInvoice(invoiceId, {status: newStatus});
+            await updateInvoice(invoiceId, { status: newStatus });
             setInvoices(invoices.map(inv =>
-                inv.id === invoiceId ? {...inv, status: newStatus} : inv
+                inv.id === invoiceId ? { ...inv, status: newStatus } : inv
             ));
             toast.success('Invoice status updated');
         } catch (error) {
@@ -104,21 +122,164 @@ ${userProfile.displayName || userProfile.businessName}`;
         }
     };
 
-    const filteredInvoices = invoices.filter(invoice => {
-        if (filterStatus === 'all') return true;
-        if (filterStatus === 'overdue') {
-            return invoice.status !== 'paid' && new Date(invoice.dueDate) < new Date();
-        }
-        return invoice.status === filterStatus;
+    const filteredInvoices = useMemo(() => {
+        return clientIdFromUrl
+            ? invoices.filter(invoice => invoice.client.id === clientIdFromUrl)
+            : invoices;
+    }, [invoices, clientIdFromUrl]);
+
+    const columns = useMemo(
+        () => [
+            columnHelper.accessor('invoiceNumber', {
+                header: 'Invoice',
+                cell: (info) => (
+                    <div>
+            <span className="font-medium text-gray-900">
+              #{info.getValue()}
+            </span>
+                        <p className="text-sm text-gray-500">
+                            {format(new Date(info.row.original.createdAt), 'MMM dd, yyyy')}
+                        </p>
+                    </div>
+                ),
+            }),
+            columnHelper.accessor('client.name', {
+                header: 'Client',
+                cell: (info) => (
+                    <div>
+            <span className="font-medium text-gray-900">
+              {info.getValue()}
+            </span>
+                        <p className="text-sm text-gray-500">
+                            {info.row.original.client.email}
+                        </p>
+                    </div>
+                ),
+            }),
+            columnHelper.accessor('total', {
+                header: 'Amount',
+                cell: (info) => (
+                    <span className="font-medium text-gray-900">
+            ₹{info.getValue().toLocaleString()}
+          </span>
+                ),
+            }),
+            columnHelper.accessor('status', {
+                header: 'Status',
+                cell: (info) => {
+                    const invoice = info.row.original;
+                    return (
+                        <select
+                            value={invoice.status}
+                            onChange={(e) => handleStatusChange(invoice.id, e.target.value as Invoice['status'])}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${
+                                invoice.status === 'paid'
+                                    ? 'bg-green-100 text-green-800'
+                                    : invoice.status === 'sent'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : invoice.status === 'overdue'
+                                            ? 'bg-red-100 text-red-800'
+                                            : 'bg-gray-100 text-gray-800'
+                            }`}
+                        >
+                            <option value="draft">Draft</option>
+                            <option value="sent">Sent</option>
+                            <option value="paid">Paid</option>
+                        </select>
+                    );
+                },
+                filterFn: 'equals',
+            }),
+            columnHelper.accessor('dueDate', {
+                header: 'Due Date',
+                cell: (info) => (
+                    <span className="text-gray-600">
+            {format(new Date(info.getValue()), 'MMM dd, yyyy')}
+          </span>
+                ),
+                sortingFn: (rowA, rowB) => {
+                    const dateA = new Date(rowA.original.dueDate);
+                    const dateB = new Date(rowB.original.dueDate);
+                    return dateA.getTime() - dateB.getTime();
+                },
+            }),
+            columnHelper.display({
+                id: 'actions',
+                header: 'Actions',
+                cell: (info) => {
+                    const invoice = info.row.original;
+                    return (
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={() => handleDownloadPDF(invoice)}
+                                className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Download PDF"
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+
+                            <button
+                                onClick={() => handleSendEmail(invoice)}
+                                className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                                title="Send Email"
+                            >
+                                <Mail className="w-4 h-4" />
+                            </button>
+
+                            <Link
+                                to={`/invoices/edit/${invoice.id}`}
+                                className="p-2 text-gray-400 hover:text-yellow-600 transition-colors"
+                                title="Edit Invoice"
+                            >
+                                <Edit className="w-4 h-4" />
+                            </Link>
+
+                            <button
+                                onClick={() => handleDelete(invoice.id)}
+                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                title="Delete Invoice"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    );
+                },
+            }),
+        ],
+        [handleDelete, handleDownloadPDF, handleSendEmail, handleStatusChange]
+    );
+
+    const table = useReactTable({
+        data: filteredInvoices,
+        columns,
+        state: {
+            sorting,
+            columnFilters,
+            globalFilter,
+        },
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
+        getCoreRowModel: getCoreRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        initialState: {
+            pagination: {
+                pageSize: 10,
+            },
+        },
     });
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <LoadingSpinner size="lg"/>
+                <LoadingSpinner size="lg" />
             </div>
         );
     }
+
+    const statusOptions = ['draft', 'sent', 'paid', 'overdue'];
 
     return (
         <div className="space-y-6">
@@ -132,165 +293,211 @@ ${userProfile.displayName || userProfile.businessName}`;
                     to="/invoices/create"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                 >
-                    <Plus className="w-5 h-5"/>
+                    <Plus className="w-5 h-5" />
                     <span>Create Invoice</span>
                 </Link>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
-                <div className="flex items-center space-x-4">
-                    <Filter className="w-5 h-5 text-gray-400"/>
-                    <div className="flex space-x-2">
-                        {[
-                            {key: 'all', label: 'All'},
-                            {key: 'draft', label: 'Draft'},
-                            {key: 'sent', label: 'Sent'},
-                            {key: 'paid', label: 'Paid'},
-                            {key: 'overdue', label: 'Overdue'}
-                        ].map((filter) => (
-                            <button
-                                key={filter.key}
-                                onClick={() => setFilterStatus(filter.key as any)}
-                                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                                    filterStatus === filter.key
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                            >
-                                {filter.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
             </div>
 
             {/* Invoices Table */}
             {filteredInvoices.length === 0 ? (
                 <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                    <div
-                        className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                        <Plus className="w-8 h-8 text-gray-400"/>
+                    <div className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                        <Plus className="w-8 h-8 text-gray-400" />
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        {filterStatus === 'all' ? 'No invoices yet' : `No ${filterStatus} invoices`}
+                        No invoices yet
                     </h3>
                     <p className="text-gray-600 mb-6">
-                        {filterStatus === 'all'
-                            ? 'Get started by creating your first invoice'
-                            : `You don't have any ${filterStatus} invoices at the moment`
-                        }
+                        Get started by creating your first invoice
                     </p>
-                    {filterStatus === 'all' && (
-                        <Link
-                            to="/invoices/create"
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                        >
-                            Create Your First Invoice
-                        </Link>
-                    )}
+                    <Link
+                        to="/invoices/create"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                    >
+                        Create Your First Invoice
+                    </Link>
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-gray-50">
-                            <tr>
-                                <th className="text-left py-3 px-6 font-medium text-gray-700">Invoice</th>
-                                <th className="text-left py-3 px-6 font-medium text-gray-700">Client</th>
-                                <th className="text-left py-3 px-6 font-medium text-gray-700">Amount</th>
-                                <th className="text-left py-3 px-6 font-medium text-gray-700">Status</th>
-                                <th className="text-left py-3 px-6 font-medium text-gray-700">Due Date</th>
-                                <th className="text-left py-3 px-6 font-medium text-gray-700">Actions</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {filteredInvoices.map((invoice) => (
-                                <tr key={invoice.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-4 px-6">
-                                        <div>
-                        <span className="font-medium text-gray-900">
-                          #{invoice.invoiceNumber}
-                        </span>
-                                            <p className="text-sm text-gray-500">
-                                                {format(invoice.createdAt, 'MMM dd, yyyy')}
-                                            </p>
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div>
-                        <span className="font-medium text-gray-900">
-                          {invoice.client.name}
-                        </span>
-                                            <p className="text-sm text-gray-500">
-                                                {invoice.client.email}
-                                            </p>
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-6 font-medium text-gray-900">
-                                        ₹{invoice.total.toLocaleString()}
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <select
-                                            value={invoice.status}
-                                            onChange={(e) => handleStatusChange(invoice.id, e.target.value as Invoice['status'])}
-                                            className={`px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${
-                                                invoice.status === 'paid'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : invoice.status === 'sent'
-                                                        ? 'bg-yellow-100 text-yellow-800'
-                                                        : invoice.status === 'overdue'
-                                                            ? 'bg-red-100 text-red-800'
-                                                            : 'bg-gray-100 text-gray-800'
+                <div className="bg-white rounded-xl shadow-sm">
+                    <div className="p-6 border-b border-gray-200">
+                        <h2 className="text-lg font-semibold text-gray-900">All Invoices</h2>
+                    </div>
+                    <div className="p-6">
+                        <div className="space-y-4">
+                            {/* Search and Filter Controls */}
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                {/* Global Search */}
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search invoices..."
+                                        value={globalFilter ?? ''}
+                                        onChange={(e) => setGlobalFilter(String(e.target.value))}
+                                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className="sm:w-48">
+                                    <select
+                                        value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
+                                        onChange={(e) => {
+                                            table.getColumn('status')?.setFilterValue(
+                                                e.target.value === '' ? undefined : e.target.value
+                                            );
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="">All Statuses</option>
+                                        {statusOptions.map((status) => (
+                                            <option key={status} value={status}>
+                                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Quick Filter Buttons */}
+                            <div className="flex items-center space-x-4">
+                                <Filter className="w-5 h-5 text-gray-400" />
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={() => {
+                                            setGlobalFilter('');
+                                            table.getColumn('status')?.setFilterValue(undefined);
+                                        }}
+                                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                                            !globalFilter && !table.getColumn('status')?.getFilterValue()
+                                                ? 'bg-blue-100 text-blue-800'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        All
+                                    </button>
+                                    {statusOptions.map((status) => (
+                                        <button
+                                            key={status}
+                                            onClick={() => {
+                                                setGlobalFilter('');
+                                                table.getColumn('status')?.setFilterValue(status);
+                                            }}
+                                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                                                table.getColumn('status')?.getFilterValue() === status
+                                                    ? 'bg-blue-100 text-blue-800'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                             }`}
                                         >
-                                            <option value="draft">Draft</option>
-                                            <option value="sent">Sent</option>
-                                            <option value="paid">Paid</option>
-                                        </select>
-                                    </td>
-                                    <td className="py-4 px-6 text-gray-600">
-                                        {format(invoice.dueDate, 'MMM dd, yyyy')}
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div className="flex items-center space-x-2">
-                                            <button
-                                                onClick={() => handleDownloadPDF(invoice)}
-                                                className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                                                title="Download PDF"
-                                            >
-                                                <Download className="w-4 h-4"/>
-                                            </button>
+                                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
 
-                                            <button
-                                                onClick={() => handleSendEmail(invoice)}
-                                                className="p-2 text-gray-400 hover:text-green-600 transition-colors"
-                                                title="Send Email"
-                                            >
-                                                <Mail className="w-4 h-4"/>
-                                            </button>
+                            {/* Table */}
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead className="bg-gray-50">
+                                    {table.getHeaderGroups().map((headerGroup) => (
+                                        <tr key={headerGroup.id}>
+                                            {headerGroup.headers.map((header) => (
+                                                <th
+                                                    key={header.id}
+                                                    className="text-left py-3 px-6 font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                                                    onClick={header.column.getToggleSortingHandler()}
+                                                >
+                                                    <div className="flex items-center space-x-1">
+                                                        {flexRender(
+                                                            header.column.columnDef.header,
+                                                            header.getContext()
+                                                        )}
+                                                        <span>
+                                {header.column.getIsSorted()
+                                    ? header.column.getIsSorted() === 'desc'
+                                        ? ' ↓'
+                                        : ' ↑'
+                                    : ''}
+                              </span>
+                                                    </div>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                    </thead>
+                                    <tbody>
+                                    {table.getRowModel().rows.map((row) => (
+                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                            {row.getVisibleCells().map((cell) => (
+                                                <td key={cell.id} className="py-4 px-6">
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                                            <Link
-                                                to={`/invoices/edit/${invoice.id}`}
-                                                className="p-2 text-gray-400 hover:text-yellow-600 transition-colors"
-                                                title="Edit Invoice"
-                                            >
-                                                <Edit className="w-4 h-4"/>
-                                            </Link>
+                            {/* Pagination */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                        onClick={() => table.setPageIndex(0)}
+                                        disabled={!table.getCanPreviousPage()}
+                                    >
+                                        {'<<'}
+                                    </button>
+                                    <button
+                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                        onClick={() => table.previousPage()}
+                                        disabled={!table.getCanPreviousPage()}
+                                    >
+                                        {'<'}
+                                    </button>
+                                    <button
+                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                        onClick={() => table.nextPage()}
+                                        disabled={!table.getCanNextPage()}
+                                    >
+                                        {'>'}
+                                    </button>
+                                    <button
+                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                        onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                                        disabled={!table.getCanNextPage()}
+                                    >
+                                        {'>>'}
+                                    </button>
+                                </div>
 
-                                            <button
-                                                onClick={() => handleDelete(invoice.id)}
-                                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                                                title="Delete Invoice"
-                                            >
-                                                <Trash2 className="w-4 h-4"/>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
+                                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-700">
+                    Page {table.getState().pagination.pageIndex + 1} of{' '}
+                      {table.getPageCount()}
+                  </span>
+                                    <select
+                                        value={table.getState().pagination.pageSize}
+                                        onChange={(e) => {
+                                            table.setPageSize(Number(e.target.value));
+                                        }}
+                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                    >
+                                        {[10, 20, 30, 40, 50].map((pageSize) => (
+                                            <option key={pageSize} value={pageSize}>
+                                                Show {pageSize}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="text-sm text-gray-700">
+                                    Showing {table.getRowModel().rows.length} of{' '}
+                                    {table.getFilteredRowModel().rows.length} entries
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
