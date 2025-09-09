@@ -303,5 +303,5 @@ export function calculateInvoiceTotals(items: InvoiceItem[], taxRate: number): {
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
 
-    return { subtotal, taxAmount, total };
+    return {subtotal, taxAmount, total};
 }

@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { deleteClient, getClients } from '../../services/firestore';
-import { Client } from '../../types';
-import { Edit, Mail, MapPin, Phone, Plus, Trash2, Search, FileText, Receipt } from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {useAuth} from '../../contexts/AuthContext';
+import {deleteClient, getClients} from '../../services/firestore';
+import {Client} from '../../types';
+import {Edit, FileText, Mail, MapPin, Phone, Plus, Receipt, Search, Trash2} from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ClientForm from './ClientForm';
 import toast from 'react-hot-toast';
 
 const ClientList: React.FC = () => {
-    const { userProfile } = useAuth();
+    const {userProfile} = useAuth();
     const navigate = useNavigate();
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
@@ -85,7 +85,7 @@ const ClientList: React.FC = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <LoadingSpinner size="lg" />
+                <LoadingSpinner size="lg"/>
             </div>
         );
     }
@@ -102,7 +102,7 @@ const ClientList: React.FC = () => {
                     onClick={() => setShowForm(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                 >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-5 h-5"/>
                     <span>Add Client</span>
                 </button>
             </div>
@@ -112,7 +112,7 @@ const ClientList: React.FC = () => {
                 <div className="flex flex-col sm:flex-row gap-4">
                     {/* Search */}
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4"/>
                         <input
                             type="text"
                             placeholder="Search clients by name, email, phone, or address..."
@@ -145,8 +145,9 @@ const ClientList: React.FC = () => {
             {/* Clients Grid */}
             {filteredClients.length === 0 ? (
                 <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                    <div className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                        <Plus className="w-8 h-8 text-gray-400" />
+                    <div
+                        className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                        <Plus className="w-8 h-8 text-gray-400"/>
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
                         {clients.length === 0 ? 'No clients yet' : 'No clients found'}
@@ -181,32 +182,32 @@ const ClientList: React.FC = () => {
                                             onClick={() => handleEdit(client)}
                                             className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                                         >
-                                            <Edit className="w-4 h-4" />
+                                            <Edit className="w-4 h-4"/>
                                         </button>
                                         <button
                                             onClick={() => handleDelete(client.id)}
                                             className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4"/>
                                         </button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-3 mb-4">
                                     <div className="flex items-start space-x-2">
-                                        <Mail className="w-4 h-4 text-gray-400 mt-0.5" />
+                                        <Mail className="w-4 h-4 text-gray-400 mt-0.5"/>
                                         <span className="text-sm text-gray-600">{client.email}</span>
                                     </div>
 
                                     {client.phone && (
                                         <div className="flex items-center space-x-2">
-                                            <Phone className="w-4 h-4 text-gray-400" />
+                                            <Phone className="w-4 h-4 text-gray-400"/>
                                             <span className="text-sm text-gray-600">{client.phone}</span>
                                         </div>
                                     )}
 
                                     <div className="flex items-start space-x-2">
-                                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5"/>
                                         <span className="text-sm text-gray-600">{client.address}</span>
                                     </div>
 
@@ -224,14 +225,14 @@ const ClientList: React.FC = () => {
                                         onClick={() => handleViewInvoices(client.id)}
                                         className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-1"
                                     >
-                                        <FileText className="w-4 h-4" />
+                                        <FileText className="w-4 h-4"/>
                                         <span>All Invoices</span>
                                     </button>
                                     <button
                                         onClick={() => handleCreateInvoice(client.id)}
                                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-1"
                                     >
-                                        <Receipt className="w-4 h-4" />
+                                        <Receipt className="w-4 h-4"/>
                                         <span>Create Invoice</span>
                                     </button>
                                 </div>

@@ -1,34 +1,34 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Link, useSearchParams} from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { deleteInvoice, getInvoices, updateInvoice } from '../../services/firestore';
-import { generateInvoicePDF } from '../../services/pdfService';
-import { Invoice } from '../../types';
-import { Download, Edit, Filter, Mail, Plus, Search, Trash2 } from 'lucide-react';
+import {useAuth} from '../../contexts/AuthContext';
+import {deleteInvoice, getInvoices, updateInvoice} from '../../services/firestore';
+import {generateInvoicePDF} from '../../services/pdfService';
+import {Invoice} from '../../types';
+import {Download, Edit, Filter, Mail, Plus, Search, Trash2} from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import {format} from 'date-fns';
 import {
-    useReactTable,
-    getCoreRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
-    getFilteredRowModel,
+    ColumnFiltersState,
     createColumnHelper,
     flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
     SortingState,
-    ColumnFiltersState,
+    useReactTable,
 } from '@tanstack/react-table';
 
 const columnHelper = createColumnHelper<Invoice>();
 
 const InvoiceList: React.FC = () => {
-    const { userProfile } = useAuth();
+    const {userProfile} = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-    const [globalFilter, setGlobalFilter] = useState('');
+    const [globalFilter, setGlobalFilter] = useState();
 
     const [searchParams] = useSearchParams();
     const clientIdFromUrl = searchParams.get('clientId');
@@ -111,9 +111,9 @@ ${userProfile.displayName || userProfile.businessName}`;
 
     const handleStatusChange = async (invoiceId: string, newStatus: Invoice['status']) => {
         try {
-            await updateInvoice(invoiceId, { status: newStatus });
+            await updateInvoice(invoiceId, {status: newStatus});
             setInvoices(invoices.map(inv =>
-                inv.id === invoiceId ? { ...inv, status: newStatus } : inv
+                inv.id === invoiceId ? {...inv, status: newStatus} : inv
             ));
             toast.success('Invoice status updated');
         } catch (error) {
@@ -215,7 +215,7 @@ ${userProfile.displayName || userProfile.businessName}`;
                                 className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                                 title="Download PDF"
                             >
-                                <Download className="w-4 h-4" />
+                                <Download className="w-4 h-4"/>
                             </button>
 
                             <button
@@ -223,7 +223,7 @@ ${userProfile.displayName || userProfile.businessName}`;
                                 className="p-2 text-gray-400 hover:text-green-600 transition-colors"
                                 title="Send Email"
                             >
-                                <Mail className="w-4 h-4" />
+                                <Mail className="w-4 h-4"/>
                             </button>
 
                             <Link
@@ -231,7 +231,7 @@ ${userProfile.displayName || userProfile.businessName}`;
                                 className="p-2 text-gray-400 hover:text-yellow-600 transition-colors"
                                 title="Edit Invoice"
                             >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-4 h-4"/>
                             </Link>
 
                             <button
@@ -239,7 +239,7 @@ ${userProfile.displayName || userProfile.businessName}`;
                                 className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                                 title="Delete Invoice"
                             >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4"/>
                             </button>
                         </div>
                     );
@@ -274,7 +274,7 @@ ${userProfile.displayName || userProfile.businessName}`;
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <LoadingSpinner size="lg" />
+                <LoadingSpinner size="lg"/>
             </div>
         );
     }
@@ -293,214 +293,211 @@ ${userProfile.displayName || userProfile.businessName}`;
                     to="/invoices/create"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                 >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-5 h-5"/>
                     <span>Create Invoice</span>
                 </Link>
             </div>
 
             {/* Invoices Table */}
-            {filteredInvoices.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                    <div className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                        <Plus className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        No invoices yet
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                        Get started by creating your first invoice
-                    </p>
-                    <Link
-                        to="/invoices/create"
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                    >
-                        Create Your First Invoice
-                    </Link>
+            {filteredInvoices.length === 0 ? <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                <div className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-gray-400"/>
                 </div>
-            ) : (
-                <div className="bg-white rounded-xl shadow-sm">
-                    <div className="p-6 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">All Invoices</h2>
-                    </div>
-                    <div className="p-6">
-                        <div className="space-y-4">
-                            {/* Search and Filter Controls */}
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                {/* Global Search */}
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search invoices..."
-                                        value={globalFilter ?? ''}
-                                        onChange={(e) => setGlobalFilter(String(e.target.value))}
-                                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                {/* Status Filter */}
-                                <div className="sm:w-48">
-                                    <select
-                                        value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
-                                        onChange={(e) => {
-                                            table.getColumn('status')?.setFilterValue(
-                                                e.target.value === '' ? undefined : e.target.value
-                                            );
-                                        }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    >
-                                        <option value="">All Statuses</option>
-                                        {statusOptions.map((status) => (
-                                            <option key={status} value={status}>
-                                                {status.charAt(0).toUpperCase() + status.slice(1)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No invoices yet
+                </h3>
+                <p className="text-gray-600 mb-6">
+                    Get started by creating your first invoice
+                </p>
+                <Link
+                    to="/invoices/create"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                    Create Your First Invoice
+                </Link>
+            </div> : <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">All Invoices</h2>
+                </div>
+                <div className="p-6">
+                    <div className="space-y-4">
+                        {/* Search and Filter Controls */}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            {/* Global Search */}
+                            <div className="relative flex-1">
+                                <Search
+                                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4"/>
+                                <input
+                                    type="text"
+                                    placeholder="Search invoices..."
+                                    value={globalFilter ?? ''}
+                                    onChange={(e) => setGlobalFilter(String(e.target.value))}
+                                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
                             </div>
 
-                            {/* Quick Filter Buttons */}
-                            <div className="flex items-center space-x-4">
-                                <Filter className="w-5 h-5 text-gray-400" />
-                                <div className="flex space-x-2">
+                            {/* Status Filter */}
+                            <div className="sm:w-48">
+                                <select
+                                    value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
+                                    onChange={(e) => {
+                                        table.getColumn('status')?.setFilterValue(
+                                            e.target.value === '' ? undefined : e.target.value
+                                        );
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="">All Statuses</option>
+                                    {statusOptions.map((status) => (
+                                        <option key={status} value={status}>
+                                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Quick Filter Buttons */}
+                        <div className="flex items-center space-x-4">
+                            <Filter className="w-5 h-5 text-gray-400"/>
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => {
+                                        setGlobalFilter('');
+                                        table.getColumn('status')?.setFilterValue(undefined);
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                                        !globalFilter && !table.getColumn('status')?.getFilterValue()
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    All
+                                </button>
+                                {statusOptions.map((status) => (
                                     <button
+                                        key={status}
                                         onClick={() => {
                                             setGlobalFilter('');
-                                            table.getColumn('status')?.setFilterValue(undefined);
+                                            table.getColumn('status')?.setFilterValue(status);
                                         }}
                                         className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                                            !globalFilter && !table.getColumn('status')?.getFilterValue()
+                                            table.getColumn('status')?.getFilterValue() === status
                                                 ? 'bg-blue-100 text-blue-800'
                                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                     >
-                                        All
+                                        {status.charAt(0).toUpperCase() + status.slice(1)}
                                     </button>
-                                    {statusOptions.map((status) => (
-                                        <button
-                                            key={status}
-                                            onClick={() => {
-                                                setGlobalFilter('');
-                                                table.getColumn('status')?.setFilterValue(status);
-                                            }}
-                                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                                                table.getColumn('status')?.getFilterValue() === status
-                                                    ? 'bg-blue-100 text-blue-800'
-                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            {status.charAt(0).toUpperCase() + status.slice(1)}
-                                        </button>
-                                    ))}
-                                </div>
+                                ))}
                             </div>
+                        </div>
 
-                            {/* Table */}
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                    <thead className="bg-gray-50">
-                                    {table.getHeaderGroups().map((headerGroup) => (
-                                        <tr key={headerGroup.id}>
-                                            {headerGroup.headers.map((header) => (
-                                                <th
-                                                    key={header.id}
-                                                    className="text-left py-3 px-6 font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
-                                                    onClick={header.column.getToggleSortingHandler()}
-                                                >
-                                                    <div className="flex items-center space-x-1">
-                                                        {flexRender(
-                                                            header.column.columnDef.header,
-                                                            header.getContext()
-                                                        )}
-                                                        <span>
+                        {/* Table */}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                                <thead className="bg-gray-50">
+                                {table.getHeaderGroups().map((headerGroup) => (
+                                    <tr key={headerGroup.id}>
+                                        {headerGroup.headers.map((header) => (
+                                            <th
+                                                key={header.id}
+                                                className="text-left py-3 px-6 font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                                                onClick={header.column.getToggleSortingHandler()}
+                                            >
+                                                <div className="flex items-center space-x-1">
+                                                    {flexRender(
+                                                        header.column.columnDef.header,
+                                                        header.getContext()
+                                                    )}
+                                                    <span>
                                 {header.column.getIsSorted()
                                     ? header.column.getIsSorted() === 'desc'
                                         ? ' ↓'
                                         : ' ↑'
                                     : ''}
                               </span>
-                                                    </div>
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                    </thead>
-                                    <tbody>
-                                    {table.getRowModel().rows.map((row) => (
-                                        <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                            {row.getVisibleCells().map((cell) => (
-                                                <td key={cell.id} className="py-4 px-6">
-                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                    </tbody>
-                                </table>
+                                                </div>
+                                            </th>
+                                        ))}
+                                    </tr>
+                                ))}
+                                </thead>
+                                <tbody>
+                                {table.getRowModel().rows.map((row) => (
+                                    <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        {row.getVisibleCells().map((cell) => (
+                                            <td key={cell.id} className="py-4 px-6">
+                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    onClick={() => table.setPageIndex(0)}
+                                    disabled={!table.getCanPreviousPage()}
+                                >
+                                    {'<<'}
+                                </button>
+                                <button
+                                    className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    onClick={() => table.previousPage()}
+                                    disabled={!table.getCanPreviousPage()}
+                                >
+                                    {'<'}
+                                </button>
+                                <button
+                                    className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    onClick={() => table.nextPage()}
+                                    disabled={!table.getCanNextPage()}
+                                >
+                                    {'>'}
+                                </button>
+                                <button
+                                    className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                                    disabled={!table.getCanNextPage()}
+                                >
+                                    {'>>'}
+                                </button>
                             </div>
 
-                            {/* Pagination */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    <button
-                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                        onClick={() => table.setPageIndex(0)}
-                                        disabled={!table.getCanPreviousPage()}
-                                    >
-                                        {'<<'}
-                                    </button>
-                                    <button
-                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                        onClick={() => table.previousPage()}
-                                        disabled={!table.getCanPreviousPage()}
-                                    >
-                                        {'<'}
-                                    </button>
-                                    <button
-                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                        onClick={() => table.nextPage()}
-                                        disabled={!table.getCanNextPage()}
-                                    >
-                                        {'>'}
-                                    </button>
-                                    <button
-                                        className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                        onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                        disabled={!table.getCanNextPage()}
-                                    >
-                                        {'>>'}
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-700">
                     Page {table.getState().pagination.pageIndex + 1} of{' '}
                       {table.getPageCount()}
                   </span>
-                                    <select
-                                        value={table.getState().pagination.pageSize}
-                                        onChange={(e) => {
-                                            table.setPageSize(Number(e.target.value));
-                                        }}
-                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                    >
-                                        {[10, 20, 30, 40, 50].map((pageSize) => (
-                                            <option key={pageSize} value={pageSize}>
-                                                Show {pageSize}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <select
+                                    value={table.getState().pagination.pageSize}
+                                    onChange={(e) => {
+                                        table.setPageSize(Number(e.target.value));
+                                    }}
+                                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                >
+                                    {[10, 20, 30, 40, 50].map((pageSize) => (
+                                        <option key={pageSize} value={pageSize}>
+                                            Show {pageSize}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
-                                <div className="text-sm text-gray-700">
-                                    Showing {table.getRowModel().rows.length} of{' '}
-                                    {table.getFilteredRowModel().rows.length} entries
-                                </div>
+                            <div className="text-sm text-gray-700">
+                                Showing {table.getRowModel().rows.length} of{' '}
+                                {table.getFilteredRowModel().rows.length} entries
                             </div>
                         </div>
                     </div>
                 </div>
-            )}
+            </div>}
         </div>
     );
 };

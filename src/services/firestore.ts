@@ -1,23 +1,18 @@
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
-  writeBatch,
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    orderBy,
+    query,
+    serverTimestamp,
+    updateDoc,
+    where,
+    writeBatch,
 } from 'firebase/firestore';
-import {
-  deleteUser,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  getAuth
-} from 'firebase/auth';
+import {deleteUser, EmailAuthProvider, getAuth, reauthenticateWithCredential} from 'firebase/auth';
 import {db} from '../config/firebase';
 import {Client, Invoice, User} from '../types';
 
@@ -28,15 +23,15 @@ import {Client, Invoice, User} from '../types';
  * @returns Promise<void>
  */
 export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<void> => {
-  try {
-    await updateDoc(doc(db, 'users', userId), {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    throw new Error('Failed to update user profile');
-  }
+    try {
+        await updateDoc(doc(db, 'users', userId), {
+            ...data,
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        throw new Error('Failed to update user profile');
+    }
 };
 
 /**
@@ -45,24 +40,24 @@ export const updateUserProfile = async (userId: string, data: Partial<User>): Pr
  * @returns Promise<User | null> - User data or null if not found
  */
 export const getUserProfile = async (userId: string): Promise<User | null> => {
-  try {
-    const docRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(docRef);
+    try {
+        const docRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
-      return {
-        uid: docSnap.id,
-        ...docSnap.data(),
-        createdAt: docSnap.data().createdAt?.toDate(),
-        updatedAt: docSnap.data().updatedAt?.toDate(),
-      } as User;
+        if (docSnap.exists()) {
+            return {
+                uid: docSnap.id,
+                ...docSnap.data(),
+                createdAt: docSnap.data().createdAt?.toDate(),
+                updatedAt: docSnap.data().updatedAt?.toDate(),
+            } as User;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error getting user profile:', error);
+        throw new Error('Failed to get user profile');
     }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    throw new Error('Failed to get user profile');
-  }
 };
 
 /**
@@ -75,77 +70,77 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
  * @throws Error if authentication fails or deletion encounters issues
  */
 export const deleteUserAccount = async (userId: string, password: string): Promise<void> => {
-  const auth = getAuth();
-  const user = auth.currentUser;
+    const auth = getAuth();
+    const user = auth.currentUser;
 
-  if (!user || user.uid !== userId) {
-    throw new Error('User not authenticated or user ID mismatch');
-  }
-
-  try {
-    // Re-authenticate user with password for security
-    if (!user.email) {
-      throw new Error('User email not found');
+    if (!user || user.uid !== userId) {
+        throw new Error('User not authenticated or user ID mismatch');
     }
 
-    const credential = EmailAuthProvider.credential(user.email, password);
-    await reauthenticateWithCredential(user, credential);
+    try {
+        // Re-authenticate user with password for security
+        if (!user.email) {
+            throw new Error('User email not found');
+        }
 
-    // Create batch for atomic deletion of all user data
-    const batch = writeBatch(db);
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(user, credential);
 
-    // Delete all user's clients
-    const clientsQuery = query(
-        collection(db, 'clients'),
-        where('userId', '==', userId)
-    );
-    const clientsSnapshot = await getDocs(clientsQuery);
+        // Create batch for atomic deletion of all user data
+        const batch = writeBatch(db);
 
-    console.log(`Deleting ${clientsSnapshot.docs.length} client records...`);
-    clientsSnapshot.docs.forEach((clientDoc) => {
-      batch.delete(clientDoc.ref);
-    });
+        // Delete all user's clients
+        const clientsQuery = query(
+            collection(db, 'clients'),
+            where('userId', '==', userId)
+        );
+        const clientsSnapshot = await getDocs(clientsQuery);
 
-    // Delete all user's invoices
-    const invoicesQuery = query(
-        collection(db, 'invoices'),
-        where('userId', '==', userId)
-    );
-    const invoicesSnapshot = await getDocs(invoicesQuery);
+        console.log(`Deleting ${clientsSnapshot.docs.length} client records...`);
+        clientsSnapshot.docs.forEach((clientDoc) => {
+            batch.delete(clientDoc.ref);
+        });
 
-    console.log(`Deleting ${invoicesSnapshot.docs.length} invoice records...`);
-    invoicesSnapshot.docs.forEach((invoiceDoc) => {
-      batch.delete(invoiceDoc.ref);
-    });
+        // Delete all user's invoices
+        const invoicesQuery = query(
+            collection(db, 'invoices'),
+            where('userId', '==', userId)
+        );
+        const invoicesSnapshot = await getDocs(invoicesQuery);
 
-    // Delete user profile document
-    batch.delete(doc(db, 'users', userId));
+        console.log(`Deleting ${invoicesSnapshot.docs.length} invoice records...`);
+        invoicesSnapshot.docs.forEach((invoiceDoc) => {
+            batch.delete(invoiceDoc.ref);
+        });
 
-    // Commit all deletions atomically
-    await batch.commit();
-    console.log('All user data deleted from Firestore');
+        // Delete user profile document
+        batch.delete(doc(db, 'users', userId));
 
-    // Finally, delete the user from Firebase Auth
-    await deleteUser(user);
-    console.log('User deleted from Firebase Auth');
+        // Commit all deletions atomically
+        await batch.commit();
+        console.log('All user data deleted from Firestore');
 
-  } catch (error: never) {
-    console.error('Error deleting user account:', error);
+        // Finally, delete the user from Firebase Auth
+        await deleteUser(user);
+        console.log('User deleted from Firebase Auth');
 
-    // Handle specific error cases with user-friendly messages
-    switch (error.code) {
-      case 'auth/wrong-password':
-        throw new Error('Incorrect password provided');
-      case 'auth/too-many-requests':
-        throw new Error('Too many failed attempts. Please try again later');
-      case 'auth/requires-recent-login':
-        throw new Error('Please log out and log back in before deleting your account');
-      case 'auth/network-request-failed':
-        throw new Error('Network error. Please check your internet connection and try again');
-      default:
-        throw new Error(error.message || 'Failed to delete account. Please try again');
+    } catch (error: never) {
+        console.error('Error deleting user account:', error);
+
+        // Handle specific error cases with user-friendly messages
+        switch (error.code) {
+            case 'auth/wrong-password':
+                throw new Error('Incorrect password provided');
+            case 'auth/too-many-requests':
+                throw new Error('Too many failed attempts. Please try again later');
+            case 'auth/requires-recent-login':
+                throw new Error('Please log out and log back in before deleting your account');
+            case 'auth/network-request-failed':
+                throw new Error('Network error. Please check your internet connection and try again');
+            default:
+                throw new Error(error.message || 'Failed to delete account. Please try again');
+        }
     }
-  }
 };
 
 // ==================== CLIENT OPERATIONS ====================
@@ -157,18 +152,18 @@ export const deleteUserAccount = async (userId: string, password: string): Promi
  * @returns Promise<string> - The created client's document ID
  */
 export const createClient = async (userId: string, clientData: Omit<Client, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  try {
-    const docRef = await addDoc(collection(db, 'clients'), {
-      ...clientData,
-      userId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error('Error creating client:', error);
-    throw new Error('Failed to create client');
-  }
+    try {
+        const docRef = await addDoc(collection(db, 'clients'), {
+            ...clientData,
+            userId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Error creating client:', error);
+        throw new Error('Failed to create client');
+    }
 };
 
 /**
@@ -177,24 +172,24 @@ export const createClient = async (userId: string, clientData: Omit<Client, 'id'
  * @returns Promise<Client[]> - Array of client objects
  */
 export const getClients = async (userId: string): Promise<Client[]> => {
-  try {
-    const q = query(
-        collection(db, 'clients'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
+    try {
+        const q = query(
+            collection(db, 'clients'),
+            where('userId', '==', userId),
+            orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
 
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate(),
-      updatedAt: doc.data().updatedAt?.toDate(),
-    })) as Client[];
-  } catch (error) {
-    console.error('Error getting clients:', error);
-    throw new Error('Failed to retrieve clients');
-  }
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+            updatedAt: doc.data().updatedAt?.toDate(),
+        })) as Client[];
+    } catch (error) {
+        console.error('Error getting clients:', error);
+        throw new Error('Failed to retrieve clients');
+    }
 };
 
 /**
@@ -204,15 +199,15 @@ export const getClients = async (userId: string): Promise<Client[]> => {
  * @returns Promise<void>
  */
 export const updateClient = async (clientId: string, data: Partial<Client>): Promise<void> => {
-  try {
-    await updateDoc(doc(db, 'clients', clientId), {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('Error updating client:', error);
-    throw new Error('Failed to update client');
-  }
+    try {
+        await updateDoc(doc(db, 'clients', clientId), {
+            ...data,
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error('Error updating client:', error);
+        throw new Error('Failed to update client');
+    }
 };
 
 /**
@@ -221,12 +216,12 @@ export const updateClient = async (clientId: string, data: Partial<Client>): Pro
  * @returns Promise<void>
  */
 export const deleteClient = async (clientId: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, 'clients', clientId));
-  } catch (error) {
-    console.error('Error deleting client:', error);
-    throw new Error('Failed to delete client');
-  }
+    try {
+        await deleteDoc(doc(db, 'clients', clientId));
+    } catch (error) {
+        console.error('Error deleting client:', error);
+        throw new Error('Failed to delete client');
+    }
 };
 
 // ==================== INVOICE OPERATIONS ====================
@@ -238,20 +233,20 @@ export const deleteClient = async (clientId: string): Promise<void> => {
  * @returns Promise<string> - The created invoice's document ID
  */
 export const createInvoice = async (userId: string, invoiceData: Omit<Invoice, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  try {
-    const docRef = await addDoc(collection(db, 'invoices'), {
-      ...invoiceData,
-      userId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      issueDate: new Date(invoiceData.issueDate),
-      dueDate: new Date(invoiceData.dueDate),
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error('Error creating invoice:', error);
-    throw new Error('Failed to create invoice');
-  }
+    try {
+        const docRef = await addDoc(collection(db, 'invoices'), {
+            ...invoiceData,
+            userId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            issueDate: new Date(invoiceData.issueDate),
+            dueDate: new Date(invoiceData.dueDate),
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Error creating invoice:', error);
+        throw new Error('Failed to create invoice');
+    }
 };
 
 /**
@@ -260,26 +255,26 @@ export const createInvoice = async (userId: string, invoiceData: Omit<Invoice, '
  * @returns Promise<Invoice[]> - Array of invoice objects
  */
 export const getInvoices = async (userId: string): Promise<Invoice[]> => {
-  try {
-    const q = query(
-        collection(db, 'invoices'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
+    try {
+        const q = query(
+            collection(db, 'invoices'),
+            where('userId', '==', userId),
+            orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
 
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate(),
-      updatedAt: doc.data().updatedAt?.toDate(),
-      issueDate: doc.data().issueDate?.toDate(),
-      dueDate: doc.data().dueDate?.toDate(),
-    })) as Invoice[];
-  } catch (error) {
-    console.error('Error getting invoices:', error);
-    throw new Error('Failed to retrieve invoices');
-  }
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+            updatedAt: doc.data().updatedAt?.toDate(),
+            issueDate: doc.data().issueDate?.toDate(),
+            dueDate: doc.data().dueDate?.toDate(),
+        })) as Invoice[];
+    } catch (error) {
+        console.error('Error getting invoices:', error);
+        throw new Error('Failed to retrieve invoices');
+    }
 };
 
 /**
@@ -289,25 +284,25 @@ export const getInvoices = async (userId: string): Promise<Invoice[]> => {
  * @returns Promise<void>
  */
 export const updateInvoice = async (invoiceId: string, data: Partial<Invoice>): Promise<void> => {
-  try {
-    const updateData: never = {
-      ...data,
-      updatedAt: serverTimestamp(),
-    };
+    try {
+        const updateData: never = {
+            ...data,
+            updatedAt: serverTimestamp(),
+        };
 
-    // Handle date fields properly
-    if (data.issueDate) {
-      updateData.issueDate = new Date(data.issueDate);
-    }
-    if (data.dueDate) {
-      updateData.dueDate = new Date(data.dueDate);
-    }
+        // Handle date fields properly
+        if (data.issueDate) {
+            updateData.issueDate = new Date(data.issueDate);
+        }
+        if (data.dueDate) {
+            updateData.dueDate = new Date(data.dueDate);
+        }
 
-    await updateDoc(doc(db, 'invoices', invoiceId), updateData);
-  } catch (error) {
-    console.error('Error updating invoice:', error);
-    throw new Error('Failed to update invoice');
-  }
+        await updateDoc(doc(db, 'invoices', invoiceId), updateData);
+    } catch (error) {
+        console.error('Error updating invoice:', error);
+        throw new Error('Failed to update invoice');
+    }
 };
 
 /**
@@ -316,12 +311,12 @@ export const updateInvoice = async (invoiceId: string, data: Partial<Invoice>): 
  * @returns Promise<void>
  */
 export const deleteInvoice = async (invoiceId: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, 'invoices', invoiceId));
-  } catch (error) {
-    console.error('Error deleting invoice:', error);
-    throw new Error('Failed to delete invoice');
-  }
+    try {
+        await deleteDoc(doc(db, 'invoices', invoiceId));
+    } catch (error) {
+        console.error('Error deleting invoice:', error);
+        throw new Error('Failed to delete invoice');
+    }
 };
 
 /**
@@ -330,26 +325,26 @@ export const deleteInvoice = async (invoiceId: string): Promise<void> => {
  * @returns Promise<Invoice | null> - Invoice object or null if not found
  */
 export const getInvoice = async (invoiceId: string): Promise<Invoice | null> => {
-  try {
-    const docRef = doc(db, 'invoices', invoiceId);
-    const docSnap = await getDoc(docRef);
+    try {
+        const docRef = doc(db, 'invoices', invoiceId);
+        const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
-      return {
-        id: docSnap.id,
-        ...docSnap.data(),
-        createdAt: docSnap.data().createdAt?.toDate(),
-        updatedAt: docSnap.data().updatedAt?.toDate(),
-        issueDate: docSnap.data().issueDate?.toDate(),
-        dueDate: docSnap.data().dueDate?.toDate(),
-      } as Invoice;
+        if (docSnap.exists()) {
+            return {
+                id: docSnap.id,
+                ...docSnap.data(),
+                createdAt: docSnap.data().createdAt?.toDate(),
+                updatedAt: docSnap.data().updatedAt?.toDate(),
+                issueDate: docSnap.data().issueDate?.toDate(),
+                dueDate: docSnap.data().dueDate?.toDate(),
+            } as Invoice;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error getting invoice:', error);
+        throw new Error('Failed to retrieve invoice');
     }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting invoice:', error);
-    throw new Error('Failed to retrieve invoice');
-  }
 };
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -360,43 +355,43 @@ export const getInvoice = async (invoiceId: string): Promise<Invoice | null> => 
  * @returns Promise<{clientCount: number, invoiceCount: number, totalInvoiced: number}>
  */
 export const getUserStats = async (userId: string): Promise<{
-  clientCount: number;
-  invoiceCount: number;
-  totalInvoiced: number;
-  paidInvoices: number;
-  pendingInvoices: number;
+    clientCount: number;
+    invoiceCount: number;
+    totalInvoiced: number;
+    paidInvoices: number;
+    pendingInvoices: number;
 }> => {
-  try {
-    // Get client count
-    const clientsQuery = query(
-        collection(db, 'clients'),
-        where('userId', '==', userId)
-    );
-    const clientsSnapshot = await getDocs(clientsQuery);
-    const clientCount = clientsSnapshot.size;
+    try {
+        // Get client count
+        const clientsQuery = query(
+            collection(db, 'clients'),
+            where('userId', '==', userId)
+        );
+        const clientsSnapshot = await getDocs(clientsQuery);
+        const clientCount = clientsSnapshot.size;
 
-    // Get invoices and calculate stats
-    const invoicesQuery = query(
-        collection(db, 'invoices'),
-        where('userId', '==', userId)
-    );
-    const invoicesSnapshot = await getDocs(invoicesQuery);
-    const invoices = invoicesSnapshot.docs.map(doc => doc.data()) as Invoice[];
+        // Get invoices and calculate stats
+        const invoicesQuery = query(
+            collection(db, 'invoices'),
+            where('userId', '==', userId)
+        );
+        const invoicesSnapshot = await getDocs(invoicesQuery);
+        const invoices = invoicesSnapshot.docs.map(doc => doc.data()) as Invoice[];
 
-    const invoiceCount = invoices.length;
-    const totalInvoiced = invoices.reduce((sum, invoice) => sum + (invoice.total || 0), 0);
-    const paidInvoices = invoices.filter(invoice => invoice.status === 'paid').length;
-    const pendingInvoices = invoices.filter(invoice => invoice.status === 'pending').length;
+        const invoiceCount = invoices.length;
+        const totalInvoiced = invoices.reduce((sum, invoice) => sum + (invoice.total || 0), 0);
+        const paidInvoices = invoices.filter(invoice => invoice.status === 'paid').length;
+        const pendingInvoices = invoices.filter(invoice => invoice.status === 'pending').length;
 
-    return {
-      clientCount,
-      invoiceCount,
-      totalInvoiced,
-      paidInvoices,
-      pendingInvoices,
-    };
-  } catch (error) {
-    console.error('Error getting user stats:', error);
-    throw new Error('Failed to retrieve user statistics');
-  }
+        return {
+            clientCount,
+            invoiceCount,
+            totalInvoiced,
+            paidInvoices,
+            pendingInvoices,
+        };
+    } catch (error) {
+        console.error('Error getting user stats:', error);
+        throw new Error('Failed to retrieve user statistics');
+    }
 };

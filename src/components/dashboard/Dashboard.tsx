@@ -1,26 +1,26 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { getClients, getInvoices } from '../../services/firestore';
-import { Client, Invoice } from '../../types';
-import { AlertCircle, Clock, DollarSign, FileText, TrendingUp, Users, Search } from 'lucide-react';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useAuth} from '../../contexts/AuthContext';
+import {getClients, getInvoices} from '../../services/firestore';
+import {Client, Invoice} from '../../types';
+import {AlertCircle, Clock, DollarSign, FileText, Search, TrendingUp, Users} from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
-import { format } from 'date-fns';
+import {format} from 'date-fns';
 import {
-    useReactTable,
-    getCoreRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
-    getFilteredRowModel,
+    ColumnFiltersState,
     createColumnHelper,
     flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
     SortingState,
-    ColumnFiltersState,
+    useReactTable,
 } from '@tanstack/react-table';
 
 const columnHelper = createColumnHelper<Invoice>();
 
 const Dashboard: React.FC = () => {
-    const { userProfile } = useAuth();
+    const {userProfile} = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
@@ -136,7 +136,7 @@ const Dashboard: React.FC = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <LoadingSpinner size="lg" />
+                <LoadingSpinner size="lg"/>
             </div>
         );
     }
@@ -200,7 +200,7 @@ const Dashboard: React.FC = () => {
                     <div key={index} className="bg-white rounded-xl shadow-sm p-6">
                         <div className="flex items-center">
                             <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                                <stat.icon className={`w-6 h-6 ${stat.color}`}/>
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">{stat.title}</p>
@@ -217,7 +217,7 @@ const Dashboard: React.FC = () => {
                     {pendingInvoices.length > 0 && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
                             <div className="flex items-center">
-                                <Clock className="w-6 h-6 text-yellow-600" />
+                                <Clock className="w-6 h-6 text-yellow-600"/>
                                 <h3 className="text-lg font-semibold text-yellow-800 ml-2">
                                     Pending Invoices
                                 </h3>
@@ -231,7 +231,7 @@ const Dashboard: React.FC = () => {
                     {overdueInvoices.length > 0 && (
                         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
                             <div className="flex items-center">
-                                <AlertCircle className="w-6 h-6 text-red-600" />
+                                <AlertCircle className="w-6 h-6 text-red-600"/>
                                 <h3 className="text-lg font-semibold text-red-800 ml-2">
                                     Overdue Invoices
                                 </h3>
@@ -267,7 +267,8 @@ const Dashboard: React.FC = () => {
                             <div className="flex flex-col sm:flex-row gap-4">
                                 {/* Global Search */}
                                 <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                    <Search
+                                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4"/>
                                     <input
                                         type="text"
                                         placeholder="Search invoices..."
